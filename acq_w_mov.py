@@ -8,13 +8,14 @@ With andor3, https://gitlab.com/ptapping/andor3/-/tree/main
 
 import numpy as np
 from tifffile import imwrite
-import matplotlib.pyplot as plt
 from datetime import datetime
 import argparse
 import os
 from os.path import join
+import time
 from andor3 import Andor3
 from utils import config_andor, platform_DaisyChain, save_config_andor, acquisition_moving_2axes
+from config import z_ini, x_ini, stepsize_z, stepsize_x
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--name", type=str)
@@ -27,8 +28,8 @@ expdate = datetime.now().strftime("_%Y_%m_%d_%H%M")
 daisychain = platform_DaisyChain()
 pidz = daisychain.pid1
 pidx = daisychain.pid2
-daisychain.config_platform(pidz, 3)  # Focus point: 7, with micrometer in 15.
-daisychain.config_platform(pidx, 9.5)
+daisychain.config_platform(pidz, z_ini)  # Focus point: 7, with micrometer in 15.
+daisychain.config_platform(pidx, x_ini)
 print("Daisy Chain platforms configurations done.")
 
 #? Camera congigurations and ROI settomg
@@ -36,12 +37,14 @@ cam_ang = Andor3()
 print(f"{cam_ang.CameraFamily} {cam_ang.CameraModel} {cam_ang.CameraName} {cam_ang.InterfaceType}")
 
 config_andor(cam_ang)
+while cam_ang.SensorTemperature > 1:
+    time.sleep(5)
 print("Camera configurations done.")
 
 save_config_andor(cam_ang, args.name, expdate)
 
 print("Starting acquisition.")
-raw_img, timer = acquisition_moving_2axes(cam_ang, pidz, pidx, args.steps)
+raw_img, timer = acquisition_moving_2axes(cam_ang, pidz, pidx, args.steps, dp1=stepsize_z)
 
 #? Disonnect devieces.
 cam_ang.close()

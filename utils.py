@@ -51,7 +51,7 @@ def config_andor(camera):
         camera.TriggerMode = "Software"
         camera.ElectronicShutteringMode = "Rolling"
         camera.ExposureTime = 9.239437E-05
-        camera.FrameCount = 4000
+        camera.FrameCount = 3300
         camera.SimplePreAmpGainControl = "16-bit (low noise & high well capacity)"
         camera.PixelReadoutRate = "280 MHz"
         camera.PixelEncoding = "Mono16"
