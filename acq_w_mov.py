@@ -14,8 +14,8 @@ import os
 from os.path import join
 import time
 from andor3 import Andor3
-from utils import config_andor, platform_DaisyChain, save_config_andor, acquisition_moving_2axes
-from config import z_ini, x_ini, stepsize_z, stepsize_x
+from utils import platform_DaisyChain, save_config_andor, acquisition_moving_2axes
+from config import z_ini, x_ini, stepsize_z, stepsize_x, config_andor
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--name", type=str)
