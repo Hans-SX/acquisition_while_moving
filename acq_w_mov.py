@@ -44,7 +44,7 @@ print("Camera configurations done.")
 save_config_andor(cam_ang, args.name, expdate)
 
 print("Starting acquisition.")
-raw_img, timer = acquisition_moving_2axes(cam_ang, pidz, pidx, args.steps, dp1=stepsize_z)
+raw_img, timer, fpc = acquisition_moving_2axes(cam_ang, pidz, pidx, args.steps, dp1=stepsize_z)
 
 #? Disonnect devieces.
 cam_ang.close()
@@ -52,16 +52,19 @@ daisychain.CloseConnection()
 
 #? Save the images
 print("Processing data.")
-images = []
-for img in raw_img:
-    images.append(cam_ang.decode_image(img)[0])
-images = np.asarray(images)
-images = np.rot90(images, 1, axes=(1,2))
-print("Saving as tif.")
 datapath = join(os.getcwd(), args.name, "data", "angular")
 if not os.path.exists(datapath):
     os.makedirs(datapath)
-imwrite(join(datapath, "angular.tif"), images)
+images = []
+cyc = 1
+for img in raw_img:
+    images.append(cam_ang.decode_image(img)[0])
+    if len(images) == fpc:
+        images = np.asarray(images)
+        images = np.rot90(images, 1, axes=(1,2))
+        imwrite(join(datapath, "angular_" + str(cyc) + ".tif"), images)
+        images = []
+        cyc += 1
 
 runtimep_name = "Runtime_profile_" + expdate + ".txt"
 timer.savefile(join(os.getcwd(), args.name, runtimep_name))

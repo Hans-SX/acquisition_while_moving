@@ -93,9 +93,9 @@ class platform_DaisyChain():
             #todo difference between different controlmodes isn't clear to me.
             #! Somehow startup did not work! After one or two test.
             pitools.startup(self.pid1, stages='M-231.17', refmodes='FNL', servostates=True, controlmodes=0x1)
-            # pitools.startup(self.pid2, stages='M-231.17', refmodes='FNL', servostates=True, controlmodes=0x1)
+            pitools.startup(self.pid2, stages='M-231.17', refmodes='FNL', servostates=True, controlmodes=0x1)
             pitools.waitontarget(self.pid1)
-            # pitools.waitontarget(self.pid2)
+            pitools.waitontarget(self.pid2)
         except:
             self.pid1.CloseConnection()
             self.pid2.CloseConnection()
@@ -146,4 +146,4 @@ def acquisition_moving_2axes(cam, pid1, pid2, steps, dp1=1, dp2=1):
     cam.flush()
     timer.stop("Whole acquisition")
 
-    return raw_img, timer
+    return raw_img, timer, fpc
