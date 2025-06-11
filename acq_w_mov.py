@@ -15,7 +15,7 @@ from os.path import join
 import time
 from andor3 import Andor3
 from utils import platform_DaisyChain, save_config_andor, acquisition_moving_2axes
-from config import z_ini, x_ini, stepsize_z, stepsize_x, config_andor
+from config import z_ini, x_ini, stepsize_z, velo_z, stepsize_x, config_andor
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--name", type=str)
@@ -28,7 +28,7 @@ expdate = datetime.now().strftime("_%Y_%m_%d_%H%M")
 daisychain = platform_DaisyChain()
 pidz = daisychain.pid1
 pidx = daisychain.pid2
-daisychain.config_platform(pidz, z_ini)  # Focus point: 7, with micrometer in 15.
+daisychain.config_platform(pidz, z_ini, velo_z)  # Focus point: 7, with micrometer in 15.
 daisychain.config_platform(pidx, x_ini)
 print("Daisy Chain platforms configurations done.")
 
@@ -56,13 +56,13 @@ datapath = join(os.getcwd(), args.name, "data", "angular")
 if not os.path.exists(datapath):
     os.makedirs(datapath)
 images = []
-cyc = 1
+cyc = 0
 for img in raw_img:
     images.append(cam_ang.decode_image(img)[0])
     if len(images) == fpc:
         images = np.asarray(images)
         images = np.rot90(images, 1, axes=(1,2))
-        imwrite(join(datapath, "angular_" + str(cyc) + ".tif"), images)
+        imwrite(join(datapath, f"angular_{cyc+1:02d}.tif"), images)
         images = []
         cyc += 1
 

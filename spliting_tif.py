@@ -10,5 +10,9 @@ print(file)
 tifs = imread(file)
 
 N = tifs.shape[0]
+
+spadir = PJ(os.getcwd(), "spatial")
+if not os.path.exists(spadir):
+    os.makedirs(spadir)
 for cyc in range(N//100):
-    imwrite(PJ(os.getcwd(), "spatial_" + str(cyc+1) + ".tif"), tifs[cyc*100:(cyc+1)*100])
+    imwrite(PJ(spadir, f"spatial_{cyc+1:02d}.tif"), tifs[cyc*100:(cyc+1)*100])

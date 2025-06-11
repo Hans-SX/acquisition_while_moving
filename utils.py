@@ -96,16 +96,17 @@ def acquisition_moving_2axes(cam, pid1, pid2, steps, dp1=1, dp2=1):
         pid1.MOV('1', ini1 + (cyc+1)*dp1)
         # pid2.MOV('1', ini2 + (cyc+1)*dp2)
         
+        timer.start("Acquisition cycle num " + str(cyc+1))
         for _ in range(fpc):
-            timer.start("Acquisition cycle num " + str(cyc+1))
             cam.command("SoftwareTrigger")
             # timeout:int, in milliseconds
             data = cam.waitBuffer(timeout="INFINITY", copy=True, requeue=True)
             #! The effect of sleep 0.01 wasn't clear, other than the total time cost.
-            # time.sleep(0.01)
-            timer.stop("Acquisition cycle num " + str(cyc+1))
+            #? 0.005 is enough for 1500 ** 2 with bining 5 (0.001 is not enough)
+            time.sleep(0.005)
+            
             raw_img.append(data)
-
+        timer.stop("Acquisition cycle num " + str(cyc+1))   
         if cyc+1 % 10 == 0:
             print(str(cyc+1) + " steps finished.")
         pitools.waitontarget(pid1)
