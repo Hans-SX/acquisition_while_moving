@@ -44,10 +44,11 @@ if __name__ == "__main__":
 
     pattern = {
                 0: fixed_acquisition,
-                1: BigStepForward_SmallStepBack(0, 17, 6, pattern=np.array((16, -8))).generate(),
-                2: SinusoidalForward(0, 17, args.steps, frequency=3).generate(),
+                1: BigStepForward_SmallStepBack(0, 17, 6, pattern=np.array((14, -4))).generate(),
+                2: SinusoidalForward(0, 17, args.steps, frequency=3, amp=3).generate(),
                 3: [17],
-                4: BigStepForward_SmallStepBack(0, 17, 6, pattern=np.array((16, -8))).generate()
+                4: BigStepForward_SmallStepBack(0, 17, 6, pattern=np.array((16, -8))).generate(), # x moves 36 times during the movement.
+                5: fixed_acquisition
     }
     expdate = datetime.now().strftime("_%Y_%m_%d_%H%M")
 
@@ -107,7 +108,7 @@ if __name__ == "__main__":
         cam_ang.FrameCount = args.steps * 100
         raw_img, timer = fixed_acquisition(cam_ang, pidz, dp1=0.25)
     elif args.pattern == 4:
-        posx = [9, 10]
+        posx = [10, 9]
         steps = len(Refocused_range(shift, pattern[1]).bigf_smallb()[1])
         cam_ang.FrameCount = steps * 100
         result_queue = queue.Queue()
@@ -117,6 +118,9 @@ if __name__ == "__main__":
         daisychain.execute_pattern_fixed_pts_x_axis(pidz, pattern[args.pattern], pidx, posx, timer)
         process_camera.join()
         raw_img = result_queue.get()
+    elif args.pattern == 5:
+        cam_ang.FrameCount = args.steps * 100
+        raw_img, timer = fixed_acquisition(cam_ang, pidz, dp1=0.5, pid2=pidx)
 
     save_config_andor(cam_ang, args.DataSet, expdate)
 

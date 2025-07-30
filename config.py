@@ -3,7 +3,7 @@ from andor3 import Andor3
 
 # Platform configs
 z_ini = 0       # focused at 6.87 mm
-x_ini = 9.5
+x_ini = 9.5       # middle at 9.5 mm, put it 9 for involving x movement.
 stepsize_z = 0.5
 stepsize_x = 1
 velo_z = 0.45  # It seems to me with this is the just right speed for 100 frames in 0.5 mm step size while Python wait 5 ms. Compare to 0.4 and 0.5.

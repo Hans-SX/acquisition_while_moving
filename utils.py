@@ -11,6 +11,7 @@ from itertools import cycle
 # from andor3 import Andor3
 from pipython import GCSDevice
 from pipython import pitools
+import numpy as np
 
 
 class Timer:
@@ -117,16 +118,33 @@ class platform_DaisyChain():
         timer.start("Platform movement")
         pos2 = cycle(pos2)
 
+        # pos2num = 0
         for p1 in range(len(pos1)):
+            if p1 == 0:
+                diff = int(abs(pos1[p1] - pid1.qPOS()['1']))
+            else:
+                diff = int(abs(pos1[p1] - pos1[p1-1]))
+            
             pid1.MOV('1', pos1[p1])
-            while p1 <= len(pos1):
+
+            for _ in range(diff):
                 pitools.waitontarget(pid2)
                 pid2.MOV('1', next(pos2))
-                if pitools.ontarget(pid1, '1'):
-                    break
+                # pos2num += 1
+            pitools.waitontarget(pid1, '1')
+        # for p1 in range(len(pos1)):
+        #     pid1.MOV('1', pos1[p1])
+            # while p1 <= len(pos1):
+            #     pitools.waitontarget(pid2)
+            #     pid2.MOV('1', next(pos2))
+            #     if pitools.ontarget(pid1, '1'):
+            #         pitools.waitontarget(pid1)
+            #         print('pidz', pid1.qPOS())
+            #         break
             
         timer.stop("Platform movement")
         print("Platform movement finished.")
+        # return pos2num
     
     def CloseConnection(self):
         self.pid1.CloseConnection()
@@ -195,7 +213,7 @@ def acquisition(cam, queue, timer):
     queue.put(raw_img)
     # return raw_img, timer
 
-def fixed_acquisition(cam, pid1, dp1, fpc=100):
+def fixed_acquisition(cam, pid1, dp1, pid2=None, dp2=np.linspace(10, 9, 3), fpc=100):
     """
     Acquiring frames at certain positions. For comparison.
     """
@@ -205,17 +223,19 @@ def fixed_acquisition(cam, pid1, dp1, fpc=100):
     cam.queueBuffer()
     raw_img = []
     ini1 = pid1.qPOS()['1']
-    # ini2 = pid2.qPOS()['1']
+    dp2 = cycle(dp2)
+
 
     timer.start("Whole acquisition")
     cam.start()
     for cyc in range(steps):
         #todo moving pattern depends on the need of exp.
         pid1.MOV('1', ini1 + (cyc+1)*dp1)
-        # pid2.MOV('1', ini2 + (cyc+1)*dp2)
-        
+        if pid2 != None:
+            pid2.MOV('1', next(dp2))
+            pitools.waitontarget(pid2)
         pitools.waitontarget(pid1)
-        # pitools.waitontarget(pid2)
+        
         timer.start("Acquisition cycle num " + str(cyc+1))
         for _ in range(fpc):
             cam.command("SoftwareTrigger")
