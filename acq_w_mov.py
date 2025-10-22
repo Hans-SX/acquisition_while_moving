@@ -17,9 +17,9 @@ import threading, multiprocessing
 import queue
 from andor3 import Andor3
 
-from utils import platform_DaisyChain, save_config_andor, fixed_acquisition, acquisition, Timer
-from config import z_ini, x_ini, stepsize_z, velo_z, stepsize_x, config_andor
-from moving_patterns import BigStepForward_SmallStepBack, SinusoidalForward, Refocused_range, shift
+from utils import platform_DaisyChain, save_config_andor, fixed_acquisition, acquisition, Timer, Signal_Stop
+from config import z_ini, x_ini, velo_z, config_andor
+from moving_patterns import BigStepForward_SmallStepBack, SinusoidalForward
 
 """
 Run this script within conda env cpi_tracking, under the parent folder of acquisition_while_moiving and cpi_optaxial_tracking.
@@ -38,16 +38,15 @@ if __name__ == "__main__":
     timer = Timer()
     parser = argparse.ArgumentParser()
     parser.add_argument("--DataSet", type=str)
-    parser.add_argument("--steps", nargs='?', const=1, type=int)
-    parser.add_argument("--pattern", nargs='?', const=1, choices=[0, 1, 2, 3, 4], type=int)
+    parser.add_argument("--pattern", nargs='?', const=1, choices=[0, 1, 2, 3, 4, 5], type=int)
     args = parser.parse_args()
 
     pattern = {
                 0: fixed_acquisition,
-                1: BigStepForward_SmallStepBack(0, 17, 6, pattern=np.array((14, -4))).generate(),
-                2: SinusoidalForward(0, 17, args.steps, frequency=3, amp=3).generate(),
+                1: BigStepForward_SmallStepBack(0, 17, pattern=np.array((16, -8))).pos_frames(),
+                2: SinusoidalForward(0, 17, 90, frequency=3, amp=3).pos_frames(),
                 3: [17],
-                4: BigStepForward_SmallStepBack(0, 17, 6, pattern=np.array((16, -8))).generate(), # x moves 36 times during the movement.
+                4: BigStepForward_SmallStepBack(0, 17, pattern=np.array((16, -8))).pos_frames(), # x moves 36 times during the movement.
                 5: fixed_acquisition
     }
     expdate = datetime.now().strftime("_%Y_%m_%d_%H%M")
@@ -74,56 +73,78 @@ if __name__ == "__main__":
     Put the camera acquisition to a thread to parallel the acquisition and the platform movement. The control of PI controller and actuator is not responding while being threw into a thread.
     There must be a better way here.
     """
-    if args.pattern == 1:
+
+
+    if args.pattern == 0:
+        #* Acquisition at every 0.25 mm.
+        dp1 = 0.25
+        cam_ang.FrameCount = int(17 / 0.25) * 100
+        raw_img, timer = fixed_acquisition(cam_ang, pidz, dp1)
+    elif args.pattern == 1:
+        signal = Signal_Stop()
         #* The FrameCount of bigf_smallb is proportional to the number of 0.5 mm intervals. That's why it is the number of expected positions times 100.
-        steps = len(Refocused_range(shift, pattern[1]).bigf_smallb()[1])
-        cam_ang.FrameCount = steps * 100
+        cam_ang.FrameCount = pattern[args.pattern]['frames']
         result_queue = queue.Queue()
-        process_camera = threading.Thread(target=acquisition, args=(cam_ang, result_queue, timer,))
+        process_camera = threading.Thread(target=acquisition, args=(cam_ang, result_queue, signal, timer,))
 
         process_camera.start()
-        daisychain.execute_pattern_single_axis(pidz, pattern[args.pattern], timer)
+        daisychain.execute_pattern_single_axis(pidz, pattern[args.pattern]['pos'], timer)
+        daisychain.signal_cam_stop(signal)
+        # print('stop signal sent.', signal.is_moving())
+        # print('before join,', threading.enumerate())
         process_camera.join()
+        # print('after join,', threading.enumerate())
+        # print('camera thread ends.')
         raw_img = result_queue.get()
     elif args.pattern == 2:
         #* The FrameCount of sinusoidal may not be optimal, the current formula is follow by previous setup which has frequency = 10. When changed to freq = 3 and make the platform wait to simulate slow velocity, this should be changed. However, the result is good, lazy.
-        cam_ang.FrameCount = args.steps * 100 / 2 * 3
+        # cam_ang.FrameCount = args.steps * 100 / 2 * 3
+        signal = Signal_Stop()
+        cam_ang.FrameCount = pattern[args.pattern]['frames']
         result_queue = queue.Queue()
-        process_camera = threading.Thread(target=acquisition, args=(cam_ang, result_queue, timer,))
+        process_camera = threading.Thread(target=acquisition, args=(cam_ang, result_queue, signal, timer,))
 
         process_camera.start()
-        daisychain.execute_pattern_appx_sinusoidal(pidz, pattern[args.pattern], timer)
+        daisychain.execute_pattern_appx_sinusoidal(pidz, pattern[args.pattern]['pos'], timer)
+        daisychain.signal_cam_stop(signal)
         process_camera.join()
         raw_img = result_queue.get()
     elif args.pattern == 3:
-        cam_ang.FrameCount = args.steps * 100
+        #* Platform from 0 to 17, non stop. With platform velocity 0.45 mm/s and acquisition rate around 100 frames/s.
+        signal = Signal_Stop()        
+        # cam_ang.FrameCount = int(17 / 0.3 + 1) * 100
+        cam_ang.FrameCount = 34 * 100
         result_queue = queue.Queue()
-        process_camera = threading.Thread(target=acquisition, args=(cam_ang, result_queue, timer,))
+        process_camera = threading.Thread(target=acquisition, args=(cam_ang, result_queue, signal, timer,))
 
         process_camera.start()
         daisychain.execute_pattern_single_axis(pidz, pattern[args.pattern], timer)
+        daisychain.signal_cam_stop(signal)
         process_camera.join()
         raw_img = result_queue.get()
-    elif args.pattern == 0:
-        cam_ang.FrameCount = args.steps * 100
-        raw_img, timer = fixed_acquisition(cam_ang, pidz, dp1=0.25)
     elif args.pattern == 4:
-        posx = [10, 9]
-        steps = len(Refocused_range(shift, pattern[1]).bigf_smallb()[1])
-        cam_ang.FrameCount = steps * 100
+        #* BigStepForward_SmallStepBack with x-axis movement.
+        signal = Signal_Stop()
+        posx = [9.7, 9.1]
+        cam_ang.FrameCount = pattern[args.pattern]['frames']
         result_queue = queue.Queue()
-        process_camera = threading.Thread(target=acquisition, args=(cam_ang, result_queue, timer,))
+        process_camera = threading.Thread(target=acquisition, args=(cam_ang, result_queue, signal, timer,))
 
         process_camera.start()
-        daisychain.execute_pattern_fixed_pts_x_axis(pidz, pattern[args.pattern], pidx, posx, timer)
+        daisychain.execute_pattern_fixed_pts_x_axis(pidz, pattern[args.pattern]['pos'], pidx, posx, timer)
+        daisychain.signal_cam_stop(signal)
         process_camera.join()
         raw_img = result_queue.get()
     elif args.pattern == 5:
-        cam_ang.FrameCount = args.steps * 100
-        raw_img, timer = fixed_acquisition(cam_ang, pidz, dp1=0.5, pid2=pidx)
+        #* Acquisition at every 0.5 mm.
+        dp1 = 0.5
+        cam_ang.FrameCount = int(17 / 0.5) * 100
+        raw_img, timer = fixed_acquisition(cam_ang, pidz, dp1, pid2=pidx)
 
     save_config_andor(cam_ang, args.DataSet, expdate)
 
+    print('x-axis position:', pidx.qPOS())
+    print('z-axis position:', pidz.qPOS())
     #? Disonnect devieces.
     cam_ang.close()
     daisychain.CloseConnection()

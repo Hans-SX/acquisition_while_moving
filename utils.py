@@ -12,6 +12,7 @@ from itertools import cycle
 from pipython import GCSDevice
 from pipython import pitools
 import numpy as np
+import threading
 
 
 class Timer:
@@ -146,6 +147,9 @@ class platform_DaisyChain():
         print("Platform movement finished.")
         # return pos2num
     
+    def signal_cam_stop(self, signal_stop):
+        signal_stop.stop()
+        
     def CloseConnection(self):
         self.pid1.CloseConnection()
         self.pid2.CloseConnection()
@@ -188,22 +192,25 @@ def acquisition_moving_2axes(cam, pid1, pid2, steps, dp1=1, dp2=1):
 
     return raw_img, timer, fpc
 
-def acquisition(cam, queue, timer):
+def acquisition(cam, queue, signal_stop, timer):
     cam.queueBuffer()
     raw_img = list()
 
     timer.start("Whole acquisition")
     cam.start()
     i = 0
-    while not i == cam.FrameCount:
+    while i < cam.FrameCount:
+    # while signal_stop.is_moving():
         cam.command("SoftwareTrigger")
-        data = cam.waitBuffer(timeout="INFINITY", copy=True, requeue=True)
+        # data = cam.waitBuffer(timeout='INFINITY', copy=True, requeue=True)
+        data = cam.waitBuffer(timeout=1000, copy=True, requeue=True)
         #? 0.005 is enough for 1500 ** 2 with bining 5 (0.001 is not enough)
         time.sleep(0.005)
         
         raw_img.append(data)
         i += 1
-    
+
+    print('after while loop,', threading.enumerate())
     print("Sensor temperature after acquisition:", cam.SensorTemperature)
     print("Acquisition finished.")
     cam.stop()
@@ -218,7 +225,7 @@ def fixed_acquisition(cam, pid1, dp1, pid2=None, dp2=np.linspace(10, 9, 3), fpc=
     Acquiring frames at certain positions. For comparison.
     """
     timer = Timer()
-    steps = int(16.5 / dp1)
+    steps = int(17 / dp1)
     cam.FrameCount = int(fpc) * steps
     cam.queueBuffer()
     raw_img = []
@@ -256,3 +263,16 @@ def fixed_acquisition(cam, pid1, dp1, pid2=None, dp2=np.linspace(10, 9, 3), fpc=
     timer.stop("Whole acquisition")
 
     return raw_img, timer
+
+class Signal_Stop:
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.movement = True
+
+    def stop(self):
+        with self.lock:
+            self.movement = False
+            
+    def is_moving(self):
+        with self.lock:
+            return self.movement
