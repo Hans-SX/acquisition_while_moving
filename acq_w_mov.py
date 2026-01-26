@@ -137,9 +137,9 @@ if __name__ == "__main__":
         raw_img = result_queue.get()
     elif args.pattern == 5:
         #* Acquisition at every 0.5 mm.
-        dp1 = 0.5
-        cam_ang.FrameCount = int(17 / 0.5) * 100
-        raw_img, timer = fixed_acquisition(cam_ang, pidz, dp1, pid2=pidx)
+        dp1 = 0.169
+        # cam_ang.FrameCount = int(17 / 0.5) * 100
+        raw_img, timer = fixed_acquisition(cam_ang, pidz, dp1, fpc=100)
 
     save_config_andor(cam_ang, args.DataSet, expdate)
 
@@ -163,7 +163,7 @@ if __name__ == "__main__":
             images = np.asarray(images)
             # Orientation need to be rotated.
             images = np.rot90(images, 1, axes=(1,2))
-            imwrite(join(datapath, f"angular_{cyc+1:02d}.tif"), images)
+            imwrite(join(datapath, f"angular_{cyc+1:03d}.tif"), images)
             images = []
             cyc += 1
 

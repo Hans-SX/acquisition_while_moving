@@ -250,12 +250,15 @@ def fixed_acquisition(cam, pid1, dp1, pid2=None, dp2=np.linspace(10, 9, 3), fpc=
             data = cam.waitBuffer(timeout="INFINITY", copy=True, requeue=True)
             #! The effect of sleep 0.01 wasn't clear, other than the total time cost.
             #? 0.005 is enough for 1500 ** 2 with bining 5 (0.001 is not enough)
-            time.sleep(0.005)
+            time.sleep(0.01)
             
             raw_img.append(data)
         timer.stop("Acquisition cycle num " + str(cyc+1))   
         if cyc+1 % 10 == 0:
             print(str(cyc+1) + " steps finished.")
+        
+        # if cyc == 3:
+        #     break
     
     print("Sensor temperature after acquisition:", cam.SensorTemperature)
     cam.stop()
