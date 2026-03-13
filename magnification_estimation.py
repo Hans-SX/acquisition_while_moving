@@ -18,6 +18,7 @@ def rotate_image(image, angle):
 
 
 if __name__ == "__main__":
+    """ The files are under 20250806-back2narrowFOV folder."""
     obj_s = 1 / 2 / 1.1 * 1e-3
 
     spa = imread('spa_mag.tif')

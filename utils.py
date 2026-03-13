@@ -225,19 +225,21 @@ def fixed_acquisition(cam, pid1, dp1, pid2=None, dp2=np.linspace(10, 9, 3), fpc=
     Acquiring frames at certain positions. For comparison.
     """
     timer = Timer()
-    steps = int(17 / dp1)
+    # steps = int(1 / 0.05) + 1
+    # pos = np.linspace(2.56, 3.56, steps)
+    steps = int(2 / 0.05) + 1
+    # pos = np.linspace(5.56, 7.56, steps)
+    pos = np.linspace(7.56, 9.56, steps)
     cam.FrameCount = int(fpc) * steps
     cam.queueBuffer()
     raw_img = []
-    ini1 = pid1.qPOS()['1']
     dp2 = cycle(dp2)
-
 
     timer.start("Whole acquisition")
     cam.start()
     for cyc in range(steps):
         #todo moving pattern depends on the need of exp.
-        pid1.MOV('1', ini1 + (cyc+1)*dp1)
+        pid1.MOV('1', pos[cyc])
         if pid2 != None:
             pid2.MOV('1', next(dp2))
             pitools.waitontarget(pid2)

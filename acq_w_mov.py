@@ -45,10 +45,9 @@ if __name__ == "__main__":
                 0: fixed_acquisition,
                 1: BigStepForward_SmallStepBack(0, 17, pattern=np.array((16, -8))).pos_frames(),
                 2: SinusoidalForward(0, 17, 90, frequency=3, amp=3).pos_frames(),
-                3: [17],
-                4: BigStepForward_SmallStepBack(0, 17, pattern=np.array((16, -8))).pos_frames(), # x moves 36 times during the movement.
-                5: fixed_acquisition
-    }
+                3: [10],
+                4: BigStepForward_SmallStepBack(0, 17, pattern=np.array((16, -8))).pos_frames() # x moves 36 times during the movement.    
+                }
     expdate = datetime.now().strftime("_%Y_%m_%d_%H%M")
 
     #? Platforms configuration and Daisy chain connection.
@@ -76,10 +75,11 @@ if __name__ == "__main__":
 
 
     if args.pattern == 0:
-        #* Acquisition at every 0.25 mm.
-        dp1 = 0.25
-        cam_ang.FrameCount = int(17 / 0.25) * 100
-        raw_img, timer = fixed_acquisition(cam_ang, pidz, dp1)
+        #* Acquisition at every 0.5 mm.
+        dp1 = 0.05
+        # cam_ang.FrameCount = int(17 / 0.5) * 100
+        raw_img, timer = fixed_acquisition(cam_ang, pidz, dp1, fpc=100)
+
     elif args.pattern == 1:
         signal = Signal_Stop()
         #* The FrameCount of bigf_smallb is proportional to the number of 0.5 mm intervals. That's why it is the number of expected positions times 100.
@@ -90,11 +90,7 @@ if __name__ == "__main__":
         process_camera.start()
         daisychain.execute_pattern_single_axis(pidz, pattern[args.pattern]['pos'], timer)
         daisychain.signal_cam_stop(signal)
-        # print('stop signal sent.', signal.is_moving())
-        # print('before join,', threading.enumerate())
         process_camera.join()
-        # print('after join,', threading.enumerate())
-        # print('camera thread ends.')
         raw_img = result_queue.get()
     elif args.pattern == 2:
         #* The FrameCount of sinusoidal may not be optimal, the current formula is follow by previous setup which has frequency = 10. When changed to freq = 3 and make the platform wait to simulate slow velocity, this should be changed. However, the result is good, lazy.
@@ -110,10 +106,10 @@ if __name__ == "__main__":
         process_camera.join()
         raw_img = result_queue.get()
     elif args.pattern == 3:
-        #* Platform from 0 to 17, non stop. With platform velocity 0.45 mm/s and acquisition rate around 100 frames/s.
+        #* Platform from 0 to pattern[args.pattern], non stop. With platform velocity 0.5 mm/s and acquisition rate around 100 frames/s.
         signal = Signal_Stop()        
         # cam_ang.FrameCount = int(17 / 0.3 + 1) * 100
-        cam_ang.FrameCount = 34 * 100
+        cam_ang.FrameCount = 20 * 100
         result_queue = queue.Queue()
         process_camera = threading.Thread(target=acquisition, args=(cam_ang, result_queue, signal, timer,))
 
@@ -135,11 +131,6 @@ if __name__ == "__main__":
         daisychain.signal_cam_stop(signal)
         process_camera.join()
         raw_img = result_queue.get()
-    elif args.pattern == 5:
-        #* Acquisition at every 0.5 mm.
-        dp1 = 0.169
-        # cam_ang.FrameCount = int(17 / 0.5) * 100
-        raw_img, timer = fixed_acquisition(cam_ang, pidz, dp1, fpc=100)
 
     save_config_andor(cam_ang, args.DataSet, expdate)
 
