@@ -1,4 +1,3 @@
-
 from tifffile import imread, imwrite
 import os
 from os.path import join as PJ

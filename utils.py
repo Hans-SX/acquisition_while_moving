@@ -192,7 +192,7 @@ def acquisition_moving_2axes(cam, pid1, pid2, steps, dp1=1, dp2=1):
 
     return raw_img, timer, fpc
 
-def acquisition(cam, queue, signal_stop, timer):
+def acquisition(cam, timer):
     cam.queueBuffer()
     raw_img = list()
 
@@ -210,26 +210,22 @@ def acquisition(cam, queue, signal_stop, timer):
         raw_img.append(data)
         i += 1
 
-    print('after while loop,', threading.enumerate())
     print("Sensor temperature after acquisition:", cam.SensorTemperature)
     print("Acquisition finished.")
     cam.stop()
     cam.flush()
     timer.stop("Whole acquisition")
 
-    queue.put(raw_img)
-    # return raw_img, timer
+    # queue.put(raw_img)
+    return raw_img, timer
 
 def fixed_acquisition(cam, pid1, dp1, pid2=None, dp2=np.linspace(10, 9, 3), fpc=100):
     """
     Acquiring frames at certain positions. For comparison.
     """
     timer = Timer()
-    # steps = int(1 / 0.05) + 1
-    # pos = np.linspace(2.56, 3.56, steps)
-    steps = int(2 / 0.05) + 1
-    # pos = np.linspace(5.56, 7.56, steps)
-    pos = np.linspace(7.56, 9.56, steps)
+    steps = int(8 / dp1) + 1
+    pos = np.linspace(4.5, 12.5, steps)
     cam.FrameCount = int(fpc) * steps
     cam.queueBuffer()
     raw_img = []

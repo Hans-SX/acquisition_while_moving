@@ -16,6 +16,7 @@ import time
 import threading, multiprocessing
 import queue
 from andor3 import Andor3
+from pipython import pitools
 
 from utils import platform_DaisyChain, save_config_andor, fixed_acquisition, acquisition, Timer, Signal_Stop
 from config import z_ini, x_ini, velo_z, config_andor
@@ -76,7 +77,7 @@ if __name__ == "__main__":
 
     if args.pattern == 0:
         #* Acquisition at every 0.5 mm.
-        dp1 = 0.05
+        dp1 = 0.2
         # cam_ang.FrameCount = int(17 / 0.5) * 100
         raw_img, timer = fixed_acquisition(cam_ang, pidz, dp1, fpc=100)
 
@@ -131,6 +132,11 @@ if __name__ == "__main__":
         daisychain.signal_cam_stop(signal)
         process_camera.join()
         raw_img = result_queue.get()
+    elif args.pattern == 5:
+        cam_ang.FrameCount = 5000
+        pidz.MOV('1', 11.275-1.2)
+        pitools.waitontarget(pidz)
+        raw_img, timer = acquisition(cam_ang, timer)
 
     save_config_andor(cam_ang, args.DataSet, expdate)
 
@@ -142,7 +148,7 @@ if __name__ == "__main__":
 
     #? Save the images
     print("Pre processing data.")
-    fpc = 100
+    fpc = 5000 if args.pattern == 5 else 100
     datapath = join(os.getcwd(), args.DataSet, "data", "angular")
     if not os.path.exists(datapath):
         os.makedirs(datapath)
@@ -160,4 +166,4 @@ if __name__ == "__main__":
 
     runtimep_name = "Runtime_profile_" + expdate + ".txt"
     timer.savefile(join(os.getcwd(), args.DataSet, runtimep_name))
-    print("Acqusition done.")
+    print("Pre processing done.")
