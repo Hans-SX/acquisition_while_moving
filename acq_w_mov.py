@@ -18,7 +18,7 @@ import queue
 from andor3 import Andor3
 from pipython import pitools
 
-from utils import platform_DaisyChain, save_config_andor, fixed_acquisition, acquisition, Timer, Signal_Stop
+from utils import platform_DaisyChain, save_config_andor, fixed_acquisition, acquisition, Timer, Signal_Stop, record_positions
 from config import z_ini, x_ini, velo_z, config_andor
 from moving_patterns import BigStepForward_SmallStepBack, SinusoidalForward
 
@@ -44,7 +44,7 @@ if __name__ == "__main__":
 
     pattern = {
                 0: fixed_acquisition,
-                1: BigStepForward_SmallStepBack(0, 17, pattern=np.array((16, -8))).pos_frames(),
+                1: BigStepForward_SmallStepBack(6.8, 12.8, pattern=np.array((6, -3))).pos_frames(interval=0.1, time_interval=50),
                 2: SinusoidalForward(0, 17, 90, frequency=3, amp=3).pos_frames(),
                 3: [10],
                 4: BigStepForward_SmallStepBack(0, 17, pattern=np.array((16, -8))).pos_frames() # x moves 36 times during the movement.    
@@ -82,37 +82,44 @@ if __name__ == "__main__":
         raw_img, timer = fixed_acquisition(cam_ang, pidz, dp1, fpc=100)
 
     elif args.pattern == 1:
-        signal = Signal_Stop()
-        #* The FrameCount of bigf_smallb is proportional to the number of 0.5 mm intervals. That's why it is the number of expected positions times 100.
+        # signal = Signal_Stop()
+        signal = threading.Event()
+        #* The FrameCount of bigf_smallb is proportional to the number of 0.1 mm intervals. That's why it is the number of expected positions times 100.
         cam_ang.FrameCount = pattern[args.pattern]['frames']
         result_queue = queue.Queue()
-        process_camera = threading.Thread(target=acquisition, args=(cam_ang, result_queue, signal, timer,))
+        process_camera = threading.Thread(target=acquisition, args=(cam_ang, result_queue, timer,))
+        thread_record = threading.Thread(target=record_positions, args=(join(os.getcwd(), args.DataSet), signal, pidz, 1))
 
+        thread_record.start()
         process_camera.start()
         daisychain.execute_pattern_single_axis(pidz, pattern[args.pattern]['pos'], timer)
-        daisychain.signal_cam_stop(signal)
+        # daisychain.signal_cam_stop(signal)
+        signal.set()
         process_camera.join()
+        thread_record.join()
         raw_img = result_queue.get()
+
     elif args.pattern == 2:
         #* The FrameCount of sinusoidal may not be optimal, the current formula is follow by previous setup which has frequency = 10. When changed to freq = 3 and make the platform wait to simulate slow velocity, this should be changed. However, the result is good, lazy.
         # cam_ang.FrameCount = args.steps * 100 / 2 * 3
         signal = Signal_Stop()
         cam_ang.FrameCount = pattern[args.pattern]['frames']
         result_queue = queue.Queue()
-        process_camera = threading.Thread(target=acquisition, args=(cam_ang, result_queue, signal, timer,))
+        process_camera = threading.Thread(target=acquisition, args=(cam_ang, result_queue, timer,))
 
         process_camera.start()
         daisychain.execute_pattern_appx_sinusoidal(pidz, pattern[args.pattern]['pos'], timer)
         daisychain.signal_cam_stop(signal)
         process_camera.join()
         raw_img = result_queue.get()
+        
     elif args.pattern == 3:
         #* Platform from 0 to pattern[args.pattern], non stop. With platform velocity 0.5 mm/s and acquisition rate around 100 frames/s.
         signal = Signal_Stop()        
         # cam_ang.FrameCount = int(17 / 0.3 + 1) * 100
         cam_ang.FrameCount = 20 * 100
         result_queue = queue.Queue()
-        process_camera = threading.Thread(target=acquisition, args=(cam_ang, result_queue, signal, timer,))
+        process_camera = threading.Thread(target=acquisition, args=(cam_ang, result_queue, timer,))
 
         process_camera.start()
         daisychain.execute_pattern_single_axis(pidz, pattern[args.pattern], timer)
@@ -125,7 +132,7 @@ if __name__ == "__main__":
         posx = [9.7, 9.1]
         cam_ang.FrameCount = pattern[args.pattern]['frames']
         result_queue = queue.Queue()
-        process_camera = threading.Thread(target=acquisition, args=(cam_ang, result_queue, signal, timer,))
+        process_camera = threading.Thread(target=acquisition, args=(cam_ang, result_queue, timer,))
 
         process_camera.start()
         daisychain.execute_pattern_fixed_pts_x_axis(pidz, pattern[args.pattern]['pos'], pidx, posx, timer)
@@ -136,6 +143,7 @@ if __name__ == "__main__":
         cam_ang.FrameCount = 5000
         pidz.MOV('1', 11.275-1.2)
         pitools.waitontarget(pidz)
+        # need change the acquisition function, remove input queue and return the raw_img and timer directly.
         raw_img, timer = acquisition(cam_ang, timer)
 
     save_config_andor(cam_ang, args.DataSet, expdate)
@@ -145,10 +153,9 @@ if __name__ == "__main__":
     #? Disonnect devieces.
     cam_ang.close()
     daisychain.CloseConnection()
-
     #? Save the images
     print("Pre processing data.")
-    fpc = 5000 if args.pattern == 5 else 100
+    fpc = 5000 if args.pattern == 5 else 50
     datapath = join(os.getcwd(), args.DataSet, "data", "angular")
     if not os.path.exists(datapath):
         os.makedirs(datapath)
@@ -163,7 +170,6 @@ if __name__ == "__main__":
             imwrite(join(datapath, f"angular_{cyc+1:03d}.tif"), images)
             images = []
             cyc += 1
-
     runtimep_name = "Runtime_profile_" + expdate + ".txt"
     timer.savefile(join(os.getcwd(), args.DataSet, runtimep_name))
     print("Pre processing done.")

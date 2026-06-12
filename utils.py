@@ -8,11 +8,11 @@ import os
 from os.path import join
 import time
 from itertools import cycle
-# from andor3 import Andor3
 from pipython import GCSDevice
 from pipython import pitools
 import numpy as np
 import threading
+import csv
 
 
 class Timer:
@@ -81,6 +81,7 @@ class platform_DaisyChain():
         pid.VEL('1', velo)
 
     def execute_pattern_single_axis(self, pid, positions, timer):
+        print('Executing pattern with single axis movement.')
         timer.start("Platform movement")
         for pos in positions:
             pid.MOV('1', pos)
@@ -192,7 +193,7 @@ def acquisition_moving_2axes(cam, pid1, pid2, steps, dp1=1, dp2=1):
 
     return raw_img, timer, fpc
 
-def acquisition(cam, timer):
+def acquisition(cam, queue, timer):
     cam.queueBuffer()
     raw_img = list()
 
@@ -201,23 +202,30 @@ def acquisition(cam, timer):
     i = 0
     while i < cam.FrameCount:
     # while signal_stop.is_moving():
+        if i % 50 == 0:
+            timer.start("Acquisition cycle num " + str(i // 50 + 1))
         cam.command("SoftwareTrigger")
         # data = cam.waitBuffer(timeout='INFINITY', copy=True, requeue=True)
-        data = cam.waitBuffer(timeout=1000, copy=True, requeue=True)
+        data = cam.waitBuffer(timeout=200, copy=True, requeue=True)
         #? 0.005 is enough for 1500 ** 2 with bining 5 (0.001 is not enough)
-        time.sleep(0.005)
-        
+        time.sleep(0.012)
+        if i % 50 == 49:
+            timer.stop("Acquisition cycle num " + str(i // 50 + 1))
         raw_img.append(data)
         i += 1
-
+    
+    # previously, it is after cam.flush(), move here to see whether it changes the time cost.
+    timer.stop("Whole acquisition")
     print("Sensor temperature after acquisition:", cam.SensorTemperature)
     print("Acquisition finished.")
     cam.stop()
+    print("Camera stopped.")
     cam.flush()
-    timer.stop("Whole acquisition")
+    print("Camera buffer flushed.")
+    print('timer stopped.')
 
-    # queue.put(raw_img)
-    return raw_img, timer
+    queue.put(raw_img)
+    # return raw_img, timer
 
 def fixed_acquisition(cam, pid1, dp1, pid2=None, dp2=np.linspace(10, 9, 3), fpc=100):
     """
@@ -264,6 +272,20 @@ def fixed_acquisition(cam, pid1, dp1, pid2=None, dp2=np.linspace(10, 9, 3), fpc=
     timer.stop("Whole acquisition")
 
     return raw_img, timer
+
+def record_positions(output_file, stop_event, pid, interval_s):
+    t0 = time.perf_counter()
+    if not os.path.exists(output_file):
+        os.makedirs(output_file)
+    with open(join(output_file, "positions.csv"), 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['elapsed_s', 'position_mm'])
+        while not stop_event.is_set():
+            elapsed = time.perf_counter() - t0
+            pos = pid.qPOS('1')['1']
+            writer.writerow([round(elapsed, 4), pos])
+            f.flush()
+            time.sleep(interval_s)   # only blocks THIS thread
 
 class Signal_Stop:
     def __init__(self):
